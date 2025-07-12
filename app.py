@@ -10,7 +10,7 @@ class NexusGUI:
     def __init__(self, master):
         self.master = master
         self.master.title("Nexus Network GUI")
-        self.master.geometry("620x550")
+        self.master.geometry("620x750")
         self.master.minsize(600, 400)
 
         self.process = None
@@ -364,4 +364,22 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = NexusGUI(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
+
+    # --- macOS 焦点修复 ---
+    # 这是一个针对 Tkinter 在 macOS 上臭名昭著的 bug 的解决方案
+    # 该 bug 会导致应用程序窗口在启动时无法自动获得焦点。
+    if sys.platform == 'darwin': # 'darwin' 是 macOS 的系统名称
+        def force_focus():
+            # 将窗口强制置于最前
+            root.lift()
+            # 暂时将其设置为置顶窗口
+            root.attributes('-topmost', True)
+            # 在短暂延迟后，取消置顶，使其行为正常
+            root.after(10, lambda: root.attributes('-topmost', False))
+            # 强制窗口获取焦点
+            root.focus_force()
+
+        # 安排焦点修复在主循环开始时立即运行
+        root.after(0, force_focus)
+
     root.mainloop()
