@@ -1,0 +1,58 @@
+name: Build macOS Application
+
+# 控制工作流的触发时机
+on:
+  # 1. 当有代码推送到 main 分支时自动触发
+  push:
+    branches: [ main ]
+  # 2. 允许您在 GitHub 网站上手动触发此工作流
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    # 指定工作流运行在 GitHub 提供的最新版 macOS 环境中
+    runs-on: macos-latest
+
+    steps:
+      # 第 1 步：检出您的代码
+      # 这个操作会将您的仓库代码下载到 macOS 虚拟环境中
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 第 2 步：设置 Python 环境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # 您可以指定需要的 Python 版本
+
+      # 第 3 步：安装依赖包
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      # 第 4 步：为您的 CLI 工具添加可执行权限
+      # 这是在 macOS/Linux 环境下必须的一步
+      - name: Add executable permission to CLI tool
+        run: chmod +x nexus-network-mac
+
+      # 第 5 步：使用 PyInstaller 进行编译
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller \
+            --name "NexusGUI" \
+            --onefile \
+            --windowed \
+            --add-data "nexus-network-mac:." \
+            app.py
+            # 如果您有图标，可以取消下面这行的注释并提供正确的图标文件路径
+            # --icon "assets/icon.icns" \
+
+
+      # 第 6 步：上传编译好的 .app 文件
+      # 这个操作会将编译好的程序打包，方便您下载
+      - name: Upload macOS App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexusGUI-macOS
+          path: dist/NexusGUI.app 

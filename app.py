@@ -1,0 +1,339 @@
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox
+import subprocess
+import threading
+import os
+import re
+import sys
+
+class NexusGUI:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Nexus Network GUI")
+        self.master.geometry("620x550")
+        self.master.minsize(600, 400)
+
+        self.process = None
+        
+        if getattr(sys, 'frozen', False):
+            application_path = sys._MEIPASS
+        else:
+            application_path = os.path.dirname(os.path.abspath(__file__))
+        
+        self.cli_path = os.path.join(application_path, "nexus-network-mac")
+        self.node_ids_path = os.path.join(application_path, "node_ids.txt")
+
+        self.create_widgets()
+        self.load_node_ids()
+
+    def create_widgets(self):
+        # This is the correct and standard way to build a complex Tkinter UI
+        # to avoid geometry manager conflicts.
+        # 1. Create a main content frame.
+        # 2. Use .pack() to make this frame fill the entire window. This is the *only* time we will use .pack().
+        # 3. All other widgets will be placed inside this frame using .grid().
+        content_frame = tk.Frame(self.master, padx=10, pady=10)
+        content_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Create and place the notebook inside the content_frame grid
+        self.notebook = ttk.Notebook(content_frame)
+        self.notebook.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+
+        start_control_tab = tk.Frame(self.notebook, padx=10, pady=10)
+        user_node_mgmt_tab = tk.Frame(self.notebook, padx=10, pady=10)
+
+        self.notebook.add(start_control_tab, text='启动控制')
+        self.notebook.add(user_node_mgmt_tab, text='用户与节点管理')
+
+        self.create_start_control_tab(start_control_tab)
+        self.create_user_node_mgmt_tab(user_node_mgmt_tab)
+        
+        # Create and place the output frame inside the content_frame grid
+        output_frame = tk.LabelFrame(content_frame, text="输出日志", padx=5, pady=5)
+        output_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=5)
+        
+        self.output_text = scrolledtext.ScrolledText(output_frame, height=10, state=tk.DISABLED, wrap=tk.WORD)
+        self.output_text.grid(row=0, column=0, sticky="nsew")
+
+    def create_start_control_tab(self, parent_frame):
+        control_frame = tk.LabelFrame(parent_frame, text="控制面板", padx=5, pady=5)
+        control_frame.grid(row=0, column=0, sticky="ew")
+
+        ttk.Label(control_frame, text="Node IDs:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.node_ids_text = scrolledtext.ScrolledText(control_frame, height=5, width=60, wrap=tk.WORD)
+        self.node_ids_text.grid(row=0, column=1, columnspan=2, padx=5, pady=5, sticky="ew")
+
+        self.proxy_enabled = tk.BooleanVar()
+        proxy_check = ttk.Checkbutton(control_frame, text="使用代理", variable=self.proxy_enabled, command=self.toggle_proxy)
+        proxy_check.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+
+        self.proxy_url_label = ttk.Label(control_frame, text="Proxy URL:")
+        self.proxy_url_label.grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
+        self.proxy_url_entry = ttk.Entry(control_frame, width=50)
+        self.proxy_url_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+
+        self.proxy_user_pwd_label = ttk.Label(control_frame, text="Proxy User:Pwd:")
+        self.proxy_user_pwd_label.grid(row=3, column=0, padx=5, pady=5, sticky=tk.W)
+        self.proxy_user_pwd_entry = ttk.Entry(control_frame, width=50)
+        self.proxy_user_pwd_entry.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
+
+        self.restart_enabled = tk.BooleanVar()
+        restart_check = ttk.Checkbutton(control_frame, text="定时重启 (小时):", variable=self.restart_enabled)
+        restart_check.grid(row=4, column=0, padx=5, pady=5, sticky=tk.W)
+        self.restart_interval_entry = ttk.Entry(control_frame, width=10)
+        self.restart_interval_entry.grid(row=4, column=1, padx=5, pady=5, sticky=tk.W)
+        self.restart_interval_entry.insert(0, "5")
+
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=5, column=0, columnspan=3, pady=10)
+
+        self.start_button = ttk.Button(button_frame, text="启动", command=self.start_cli)
+        self.start_button.grid(row=0, column=0, padx=5)
+
+        self.stop_button = ttk.Button(button_frame, text="停止", command=self.stop_cli, state=tk.DISABLED)
+        self.stop_button.grid(row=0, column=1, padx=5)
+        
+        self.save_ids_button = ttk.Button(button_frame, text="保存列表", command=self.save_node_ids)
+        self.save_ids_button.grid(row=0, column=2, padx=5)
+
+        self.toggle_proxy()
+
+    def create_user_node_mgmt_tab(self, parent_frame):
+        user_frame = tk.LabelFrame(parent_frame, text="用户注册 (register-user)", padx=5, pady=5)
+        user_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=5)
+
+        ttk.Label(user_frame, text="钱包地址:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.wallet_address_entry = ttk.Entry(user_frame, width=50)
+        self.wallet_address_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        
+        register_user_button = ttk.Button(user_frame, text="注册用户", command=self.handle_register_user)
+        register_user_button.grid(row=0, column=2, padx=5, pady=5)
+
+        node_frame = tk.LabelFrame(parent_frame, text="节点管理 (register-node)", padx=5, pady=5)
+        node_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=(15, 5))
+
+        ttk.Label(node_frame, text="创建数量:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.node_count_entry = ttk.Entry(node_frame, width=10)
+        self.node_count_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.node_count_entry.insert(0, "1")
+
+        register_node_button = ttk.Button(node_frame, text="批量创建和提取Node ID", command=self.handle_register_nodes)
+        register_node_button.grid(row=1, column=0, columnspan=3, pady=10)
+
+    def toggle_proxy(self):
+        state = tk.NORMAL if self.proxy_enabled.get() else tk.DISABLED
+        for child in [self.proxy_url_label, self.proxy_url_entry, self.proxy_user_pwd_label, self.proxy_user_pwd_entry]:
+            child.config(state=state)
+
+    def log(self, message):
+        self.output_text.config(state=tk.NORMAL)
+        self.output_text.insert(tk.END, message + "\n")
+        self.output_text.see(tk.END)
+        self.output_text.config(state=tk.DISABLED)
+        self.master.update_idletasks()
+
+    def start_cli(self):
+        if not os.path.exists(self.cli_path):
+             messagebox.showerror("错误", f"未找到CLI程序: {self.cli_path}\n请确保 'nexus-network-mac' 文件与本程序位于同一目录下，或在打包时已正确包含。")
+             return
+
+        node_ids_str = self.node_ids_text.get("1.0", tk.END).strip()
+        if not node_ids_str:
+            messagebox.showerror("错误", "Node IDs不能为空。")
+            return
+        
+        node_ids = node_ids_str.split()
+        cmd = [self.cli_path, "start", "--headless", "--node-ids"] + node_ids
+
+        if self.proxy_enabled.get():
+            proxy_url = self.proxy_url_entry.get().strip()
+            proxy_user_pwd = self.proxy_user_pwd_entry.get().strip()
+            if not proxy_url or not proxy_user_pwd:
+                messagebox.showerror("错误", "代理URL和用户密码不能为空。")
+                return
+            cmd.extend(["--proxy-url", proxy_url, "--proxy-user-pwd", proxy_user_pwd])
+
+        try:
+            creationflags = 0
+            if sys.platform == "win32":
+                creationflags = subprocess.CREATE_NO_WINDOW
+            
+            self.log(f"执行命令: {' '.join(cmd)}")
+            self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True, creationflags=creationflags)
+            
+            threading.Thread(target=self.read_output, args=(self.process.stdout,), daemon=True).start()
+            threading.Thread(target=self.read_output, args=(self.process.stderr,), daemon=True).start()
+
+            self.start_button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.NORMAL)
+
+            if self.restart_enabled.get():
+                try:
+                    interval_hours = float(self.restart_interval_entry.get())
+                    interval_seconds = interval_hours * 3600
+                    self.log(f"已启用定时重启，将在 {interval_hours} 小时后重启。")
+                    self.restart_timer = threading.Timer(interval_seconds, self.restart_cli)
+                    self.restart_timer.start()
+                except ValueError:
+                    messagebox.showerror("错误", "重启时间间隔必须是数字。")
+                    self.stop_cli()
+
+        except Exception as e:
+            messagebox.showerror("启动失败", str(e))
+            self.log(f"启动失败: {e}")
+
+    def read_output(self, pipe):
+        for line in iter(pipe.readline, ''):
+            self.log(line.strip())
+        pipe.close()
+
+    def stop_cli(self, restarting=False):
+        if hasattr(self, 'restart_timer') and self.restart_timer.is_alive():
+            self.restart_timer.cancel()
+            
+        if self.process:
+            self.log("正在停止CLI...")
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.log("强制终止CLI...")
+                self.process.kill()
+            self.process = None
+            self.log("CLI已停止。")
+
+        self.start_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
+        if not restarting:
+            self.log("--------------------")
+
+    def restart_cli(self):
+        self.log("定时重启：正在重启CLI...")
+        self.stop_cli(restarting=True)
+        self.master.after(2000, self.start_cli)
+
+    def save_node_ids(self):
+        try:
+            node_ids = self.node_ids_text.get("1.0", tk.END).strip()
+            with open(self.node_ids_path, "w") as f:
+                f.write(node_ids)
+            self.log("Node ID列表已保存。")
+            messagebox.showinfo("成功", "Node ID列表已成功保存！")
+        except Exception as e:
+            self.log(f"保存Node ID失败: {e}")
+            messagebox.showerror("错误", f"保存Node ID失败: {e}")
+
+    def load_node_ids(self):
+        if os.path.exists(self.node_ids_path):
+            try:
+                with open(self.node_ids_path, "r") as f:
+                    node_ids = f.read()
+                if node_ids:
+                    self.node_ids_text.delete("1.0", tk.END)
+                    self.node_ids_text.insert("1.0", node_ids)
+                    self.log("已成功加载上次保存的Node ID列表。")
+            except Exception as e:
+                self.log(f"加载Node ID失败: {e}")
+
+    def on_closing(self):
+        if self.process:
+            if messagebox.askokcancel("退出", "CLI正在运行。确定要退出并终止CLI吗?"):
+                self.stop_cli()
+                self.master.destroy()
+        else:
+            self.master.destroy()
+
+    def handle_register_user(self):
+        threading.Thread(target=self.register_user_thread, daemon=True).start()
+
+    def handle_register_nodes(self):
+        threading.Thread(target=self.register_nodes_thread, daemon=True).start()
+
+    def run_management_command(self, cmd):
+        self.log(f"执行命令: {' '.join(cmd)}")
+        try:
+            creationflags = 0
+            if sys.platform == "win32":
+                creationflags = subprocess.CREATE_NO_WINDOW
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True, creationflags=creationflags)
+            
+            output_lines = []
+            for line in iter(process.stdout.readline, ''):
+                clean_line = line.strip()
+                self.log(clean_line)
+                output_lines.append(clean_line)
+            
+            process.stdout.close()
+            process.wait()
+            
+            if process.returncode != 0:
+                self.log(f"命令执行失败，返回码: {process.returncode}")
+            
+            return output_lines
+
+        except FileNotFoundError:
+            messagebox.showerror("错误", f"未找到CLI程序: {self.cli_path}")
+            return None
+        except Exception as e:
+            self.log(f"执行命令时发生错误: {e}")
+            messagebox.showerror("错误", f"执行命令时发生错误: {e}")
+            return None
+
+    def register_user_thread(self):
+        wallet_address = self.wallet_address_entry.get().strip()
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", wallet_address):
+            self.log("错误: 无效的钱包地址。")
+            messagebox.showerror("错误", "无效的钱包地址。它必须是一个以 '0x' 开头的42个字符的十六进制字符串。")
+            return
+            
+        cmd = [self.cli_path, "register-user", "--wallet-address", wallet_address]
+        self.run_management_command(cmd)
+        self.log("用户注册命令执行完毕。")
+
+    def register_nodes_thread(self):
+        try:
+            count = int(self.node_count_entry.get())
+            if count <= 0: raise ValueError
+        except ValueError:
+            messagebox.showerror("错误", "创建数量必须是一个正整数。")
+            return
+
+        newly_created_ids = []
+        for i in range(count):
+            self.log(f"--- 正在创建第 {i+1}/{count} 个节点 ---")
+            cmd = [self.cli_path, "register-node"]
+            output = self.run_management_command(cmd)
+
+            if output:
+                found_id = None
+                for line in output:
+                    if "node" in line.lower() and "id" in line.lower():
+                        match = re.search(r'\b\d{7,}\b', line)
+                        if match:
+                            found_id = match.group(0)
+                            self.log(f"成功提取 Node ID: {found_id}")
+                            newly_created_ids.append(found_id)
+                            break
+                if not found_id:
+                    self.log("警告: 未能在命令输出中找到新的 Node ID。")
+
+        if newly_created_ids:
+            self.log(f"成功创建 {len(newly_created_ids)} 个新的 Node ID: {', '.join(newly_created_ids)}")
+            
+            current_ids = self.node_ids_text.get("1.0", tk.END).strip()
+            new_ids_str = " ".join(newly_created_ids)
+            updated_ids = (current_ids + " " + new_ids_str) if current_ids else new_ids_str
+            
+            self.node_ids_text.delete("1.0", tk.END)
+            self.node_ids_text.insert("1.0", updated_ids)
+            
+            self.log("新的 Node ID 已自动填充到 '启动控制' 选项卡。")
+            self.notebook.select(0)
+        
+        self.log("批量创建节点操作完成。")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = NexusGUI(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_closing)
+    root.mainloop()
