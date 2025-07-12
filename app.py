@@ -10,7 +10,7 @@ class NexusGUI:
     def __init__(self, master):
         self.master = master
         self.master.title("Nexus Network GUI")
-        self.master.geometry("620x750")
+        self.master.geometry("820x800")
         self.master.minsize(600, 400)
 
         self.process = None
@@ -93,7 +93,7 @@ class NexusGUI:
         output_frame = tk.LabelFrame(content_frame, text="输出日志", padx=5, pady=5)
         output_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=5)
         
-        self.output_text = scrolledtext.ScrolledText(output_frame, height=10, state=tk.DISABLED, wrap=tk.WORD)
+        self.output_text = scrolledtext.ScrolledText(output_frame, height=30, state=tk.DISABLED, wrap=tk.WORD)
         self.output_text.grid(row=0, column=0, sticky="nsew")
 
     def create_start_control_tab(self, parent_frame):
