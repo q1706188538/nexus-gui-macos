@@ -23,8 +23,33 @@ class NexusGUI:
         self.cli_path = os.path.join(application_path, "nexus-network-mac")
         self.node_ids_path = os.path.join(application_path, "node_ids.txt")
 
+        self.create_menubar()
         self.create_widgets()
         self.load_node_ids()
+
+    def create_menubar(self):
+        menubar = tk.Menu(self.master)
+        self.master.config(menu=menubar)
+
+        # App Menu (for macOS)
+        app_menu = tk.Menu(menubar, name='apple')
+        menubar.add_cascade(label="NexusGUI", menu=app_menu)
+        app_menu.add_command(label="关于 NexusGUI", command=self.show_about)
+        app_menu.add_separator()
+        app_menu.add_command(label="退出 NexusGUI", command=self.on_closing)
+
+        # Edit Menu
+        edit_menu = tk.Menu(menubar, name='edit')
+        menubar.add_cascade(label="编辑", menu=edit_menu)
+        edit_menu.add_command(label="撤销", accelerator="Cmd+Z", command=lambda: self.master.focus_get().event_generate("<<Undo>>"))
+        edit_menu.add_command(label="重做", accelerator="Cmd+Y", command=lambda: self.master.focus_get().event_generate("<<Redo>>"))
+        edit_menu.add_separator()
+        edit_menu.add_command(label="剪切", accelerator="Cmd+X", command=lambda: self.master.focus_get().event_generate("<<Cut>>"))
+        edit_menu.add_command(label="复制", accelerator="Cmd+C", command=lambda: self.master.focus_get().event_generate("<<Copy>>"))
+        edit_menu.add_command(label="粘贴", accelerator="Cmd+V", command=lambda: self.master.focus_get().event_generate("<<Paste>>"))
+        edit_menu.add_separator()
+        edit_menu.add_command(label="全选", accelerator="Cmd+A", command=lambda: self.master.focus_get().event_generate("<<SelectAll>>"))
+
 
     def create_widgets(self):
         # This is the correct and standard way to build a complex Tkinter UI
@@ -331,6 +356,9 @@ class NexusGUI:
             self.notebook.select(0)
         
         self.log("批量创建节点操作完成。")
+
+    def show_about(self):
+        messagebox.showinfo("关于", "Nexus Network GUI\n\n一个用于简化操作的图形界面。")
 
 if __name__ == "__main__":
     root = tk.Tk()
