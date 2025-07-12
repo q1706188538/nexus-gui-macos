@@ -16,12 +16,28 @@ class NexusGUI:
         self.process = None
         
         if getattr(sys, 'frozen', False):
+            # If the application is run as a bundle, the PyInstaller bootloader
+            # extends the sys module by a flag frozen=True and sets the app 
+            # path into variable _MEIPASS'.
             application_path = sys._MEIPASS
         else:
             application_path = os.path.dirname(os.path.abspath(__file__))
         
         self.cli_path = os.path.join(application_path, "nexus-network-mac")
-        self.node_ids_path = os.path.join(application_path, "node_ids.txt")
+
+        # Set up a dedicated, persistent path for user data
+        if sys.platform == 'darwin':
+            # For macOS, save in the standard Application Support directory
+            home_dir = os.path.expanduser("~")
+            self.data_dir = os.path.join(home_dir, "Library", "Application Support", "NexusGUI")
+        else:
+            # For other OSes (like Windows), save alongside the executable
+            self.data_dir = application_path
+
+        # Ensure the data directory exists
+        os.makedirs(self.data_dir, exist_ok=True)
+        
+        self.node_ids_path = os.path.join(self.data_dir, "node_ids.txt")
 
         self.create_menubar()
         self.create_widgets()
