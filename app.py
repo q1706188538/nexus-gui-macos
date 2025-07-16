@@ -108,25 +108,28 @@ class NexusGUI:
         proxy_check = ttk.Checkbutton(control_frame, text="使用代理", variable=self.proxy_enabled, command=self.toggle_proxy)
         proxy_check.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
 
-        self.proxy_url_label = ttk.Label(control_frame, text="Proxy URL:")
+        self.proxy_url_label = ttk.Label(control_frame, text="代理地址 (Proxy URL):")
         self.proxy_url_label.grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         self.proxy_url_entry = ttk.Entry(control_frame, width=50)
         self.proxy_url_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        
+        proxy_format_hint = ttk.Label(control_frame, text="提示: 代理地址格式为 [user@]host:port", font=("TkDefaultFont", 9), foreground="gray")
+        proxy_format_hint.grid(row=3, column=1, padx=5, pady=(0, 5), sticky="w")
 
-        self.proxy_user_pwd_label = ttk.Label(control_frame, text="Proxy User:Pwd:")
-        self.proxy_user_pwd_label.grid(row=3, column=0, padx=5, pady=5, sticky=tk.W)
+        self.proxy_user_pwd_label = ttk.Label(control_frame, text="代理密码 (Proxy Pwd):")
+        self.proxy_user_pwd_label.grid(row=4, column=0, padx=5, pady=5, sticky=tk.W)
         self.proxy_user_pwd_entry = ttk.Entry(control_frame, width=50)
-        self.proxy_user_pwd_entry.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
+        self.proxy_user_pwd_entry.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
 
         self.restart_enabled = tk.BooleanVar()
         restart_check = ttk.Checkbutton(control_frame, text="定时重启 (小时):", variable=self.restart_enabled)
-        restart_check.grid(row=4, column=0, padx=5, pady=5, sticky=tk.W)
+        restart_check.grid(row=5, column=0, padx=5, pady=5, sticky=tk.W)
         self.restart_interval_entry = ttk.Entry(control_frame, width=10)
-        self.restart_interval_entry.grid(row=4, column=1, padx=5, pady=5, sticky=tk.W)
+        self.restart_interval_entry.grid(row=5, column=1, padx=5, pady=5, sticky=tk.W)
         self.restart_interval_entry.insert(0, "5")
 
         button_frame = ttk.Frame(control_frame)
-        button_frame.grid(row=5, column=0, columnspan=3, pady=10)
+        button_frame.grid(row=6, column=0, columnspan=3, pady=10)
 
         self.start_button = ttk.Button(button_frame, text="启动", command=self.start_cli)
         self.start_button.grid(row=0, column=0, padx=5)
@@ -188,11 +191,15 @@ class NexusGUI:
 
         if self.proxy_enabled.get():
             proxy_url = self.proxy_url_entry.get().strip()
-            proxy_user_pwd = self.proxy_user_pwd_entry.get().strip()
-            if not proxy_url or not proxy_user_pwd:
-                messagebox.showerror("错误", "代理URL和用户密码不能为空。")
+            if not proxy_url:
+                messagebox.showerror("错误", "代理URL不能为空。")
                 return
-            cmd.extend(["--proxy-url", proxy_url, "--proxy-user-pwd", proxy_user_pwd])
+            
+            cmd.extend(["--proxy-url", proxy_url])
+
+            proxy_user_pwd = self.proxy_user_pwd_entry.get().strip()
+            if proxy_user_pwd:
+                cmd.extend(["--proxy-user-pwd", proxy_user_pwd])
 
         try:
             creationflags = 0
