@@ -44,6 +44,7 @@ jobs:
             --onefile \
             --windowed \
             --add-data "nexus-network-mac:." \
+            --hidden-import=requests \
             app.py
             # 如果您有图标，可以取消下面这行的注释并提供正确的图标文件路径
             # --icon "assets/icon.icns" \
