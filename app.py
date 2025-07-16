@@ -14,6 +14,7 @@ class NexusGUI:
         self.master = master
         self.master.title("Nexus Network GUI")
         self.master.geometry("1200x850")
+        self.master.resizable(False, False)
         self.master.minsize(600, 550)
 
         self.process = None
@@ -82,8 +83,8 @@ class NexusGUI:
 
         # Configure the grid layout for a two-column setup
         content_frame.grid_rowconfigure(0, weight=1)
-        content_frame.grid_columnconfigure(0, weight=1, minsize=450) # Left panel for controls
-        content_frame.grid_columnconfigure(1, weight=2)                # Right panel for logs
+        content_frame.grid_columnconfigure(0, weight=1, minsize=450) # Left panel for controls - will resize
+        content_frame.grid_columnconfigure(1, weight=2)                # Right panel for logs - will NOT resize
 
         # --- Left Panel ---
         # The notebook will be on the left
