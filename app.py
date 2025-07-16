@@ -42,10 +42,12 @@ class NexusGUI:
         os.makedirs(self.data_dir, exist_ok=True)
         
         self.node_ids_path = os.path.join(self.data_dir, "node_ids.txt")
+        self.settings_path = os.path.join(self.data_dir, "settings.json")
 
         self.create_menubar()
         self.create_widgets()
         self.load_node_ids()
+        self.load_settings()
 
     def create_menubar(self):
         menubar = tk.Menu(self.master)
@@ -142,8 +144,14 @@ class NexusGUI:
         self.proxy_user_pwd_entry = ttk.Entry(control_frame, width=50)
         self.proxy_user_pwd_entry.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
         
-        self.test_proxy_button = ttk.Button(control_frame, text="测试代理", command=self.test_proxy)
-        self.test_proxy_button.grid(row=4, column=2, padx=5, pady=5, sticky="e")
+        proxy_button_frame = ttk.Frame(control_frame)
+        proxy_button_frame.grid(row=4, column=2, padx=5, pady=5, sticky="w")
+        
+        self.test_proxy_button = ttk.Button(proxy_button_frame, text="测试代理", command=self.test_proxy)
+        self.test_proxy_button.grid(row=0, column=0, padx=(0, 5))
+
+        self.save_settings_button = ttk.Button(proxy_button_frame, text="保存设置", command=self.save_settings)
+        self.save_settings_button.grid(row=0, column=1)
 
         self.restart_enabled = tk.BooleanVar()
         restart_check = ttk.Checkbutton(control_frame, text="定时重启 (小时):", variable=self.restart_enabled)
@@ -331,7 +339,59 @@ class NexusGUI:
                     self.node_ids_text.insert("1.0", node_ids)
                     self.log("已成功加载上次保存的Node ID列表。")
             except Exception as e:
-                self.log(f"加载Node ID失败: {e}")
+                self.log(f"加载Node IDs时发生未知错误: {e}")
+
+    def save_settings(self):
+        """Saves the current settings (proxy, restart) to a file."""
+        settings = {
+            "proxy": {
+                "enabled": self.proxy_enabled.get(),
+                "url": self.proxy_url_entry.get().strip(),
+                "password": self.proxy_user_pwd_entry.get().strip()
+            },
+            "restart": {
+                "enabled": self.restart_enabled.get(),
+                "interval_hours": self.restart_interval_entry.get().strip()
+            }
+        }
+        try:
+            with open(self.settings_path, "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent=4)
+            self.log("设置已保存。")
+        except Exception as e:
+            messagebox.showerror("保存失败", f"无法保存设置: {e}")
+            self.log(f"保存设置失败: {e}")
+
+    def load_settings(self):
+        """Loads settings from a file on startup."""
+        if not os.path.exists(self.settings_path):
+            return
+
+        try:
+            with open(self.settings_path, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+            
+            # Load proxy settings
+            proxy_info = settings.get("proxy", {})
+            self.proxy_enabled.set(proxy_info.get("enabled", False))
+            self.proxy_url_entry.delete(0, tk.END)
+            self.proxy_url_entry.insert(0, proxy_info.get("url", ""))
+            self.proxy_user_pwd_entry.delete(0, tk.END)
+            self.proxy_user_pwd_entry.insert(0, proxy_info.get("password", ""))
+            self.toggle_proxy()
+            
+            # Load restart settings
+            restart_info = settings.get("restart", {})
+            self.restart_enabled.set(restart_info.get("enabled", False))
+            self.restart_interval_entry.delete(0, tk.END)
+            self.restart_interval_entry.insert(0, restart_info.get("interval_hours", "5"))
+
+            self.log("已加载保存的设置。")
+
+        except (json.JSONDecodeError, KeyError) as e:
+            self.log(f"加载设置失败: 文件格式错误或内容不完整 - {e}")
+        except Exception as e:
+            self.log(f"加载设置时发生未知错误: {e}")
 
     def on_closing(self):
         if self.process:
