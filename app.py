@@ -13,7 +13,7 @@ class NexusGUI:
     def __init__(self, master):
         self.master = master
         self.master.title("Nexus Network GUI")
-        self.master.geometry("1350x800")
+        self.master.geometry("1200x850")
         self.master.minsize(600, 550)
 
         self.process = None
@@ -81,17 +81,14 @@ class NexusGUI:
         content_frame.pack(fill=tk.BOTH, expand=True)
 
         # Configure the grid layout for a two-column setup
-        # Row 0 holds all the content and has a fixed height.
-        # Row 1 is an empty, expanding row that soaks up extra vertical space.
-        content_frame.grid_rowconfigure(0, weight=0)
-        content_frame.grid_rowconfigure(1, weight=1)
-        content_frame.grid_columnconfigure(0, weight=0) 
-        content_frame.grid_columnconfigure(1, weight=0)
+        content_frame.grid_rowconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1, minsize=450)
+        content_frame.grid_columnconfigure(1, weight=2)
 
         # --- Left Panel ---
-        # The notebook will be on the left, in the non-expanding row 0
+        # The notebook will be on the left
         self.notebook = ttk.Notebook(content_frame)
-        self.notebook.grid(row=0, column=0, sticky="new", padx=(0, 10))
+        self.notebook.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         start_control_tab = tk.Frame(self.notebook, padx=10, pady=10)
         user_node_mgmt_tab = tk.Frame(self.notebook, padx=10, pady=10)
@@ -103,15 +100,15 @@ class NexusGUI:
         self.create_user_node_mgmt_tab(user_node_mgmt_tab)
         
         # --- Right Panel ---
-        # The output frame will be on the right, in the non-expanding row 0
+        # The output frame will be on the right
         output_frame = tk.LabelFrame(content_frame, text="输出日志", padx=5, pady=5)
-        output_frame.grid(row=0, column=1, sticky="new")
+        output_frame.grid(row=0, column=1, sticky="nsew")
         
         # Configure the output_frame's grid so the text widget inside expands
         output_frame.grid_rowconfigure(0, weight=1)
         output_frame.grid_columnconfigure(0, weight=1)
 
-        self.output_text = scrolledtext.ScrolledText(output_frame, state=tk.DISABLED, wrap=tk.WORD, width=80, height=41)
+        self.output_text = scrolledtext.ScrolledText(output_frame, state=tk.DISABLED, wrap=tk.WORD)
         self.output_text.grid(row=0, column=0, sticky="nsew")
 
     def create_start_control_tab(self, parent_frame):
