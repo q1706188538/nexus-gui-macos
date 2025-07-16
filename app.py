@@ -5,15 +5,19 @@ import threading
 import os
 import re
 import sys
+import requests
+import json
+
 
 class NexusGUI:
     def __init__(self, master):
         self.master = master
         self.master.title("Nexus Network GUI")
-        self.master.geometry("820x800")
-        self.master.minsize(600, 400)
+        self.master.geometry("1200x850")
+        self.master.minsize(600, 550)
 
         self.process = None
+        self.stats_labels = {}
         
         if getattr(sys, 'frozen', False):
             # If the application is run as a bundle, the PyInstaller bootloader
@@ -76,9 +80,15 @@ class NexusGUI:
         content_frame = tk.Frame(self.master, padx=10, pady=10)
         content_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Create and place the notebook inside the content_frame grid
+        # Configure the grid layout for a two-column setup
+        content_frame.grid_rowconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(0, weight=1, minsize=450) # Left panel for controls
+        content_frame.grid_columnconfigure(1, weight=2)                # Right panel for logs
+
+        # --- Left Panel ---
+        # The notebook will be on the left
         self.notebook = ttk.Notebook(content_frame)
-        self.notebook.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+        self.notebook.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         start_control_tab = tk.Frame(self.notebook, padx=10, pady=10)
         user_node_mgmt_tab = tk.Frame(self.notebook, padx=10, pady=10)
@@ -89,16 +99,27 @@ class NexusGUI:
         self.create_start_control_tab(start_control_tab)
         self.create_user_node_mgmt_tab(user_node_mgmt_tab)
         
-        # Create and place the output frame inside the content_frame grid
+        # --- Right Panel ---
+        # The output frame will be on the right
         output_frame = tk.LabelFrame(content_frame, text="输出日志", padx=5, pady=5)
-        output_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=5)
+        output_frame.grid(row=0, column=1, sticky="nsew")
         
-        self.output_text = scrolledtext.ScrolledText(output_frame, height=30, state=tk.DISABLED, wrap=tk.WORD)
+        # Configure the output_frame's grid so the text widget inside expands
+        output_frame.grid_rowconfigure(0, weight=1)
+        output_frame.grid_columnconfigure(0, weight=1)
+
+        self.output_text = scrolledtext.ScrolledText(output_frame, state=tk.DISABLED, wrap=tk.WORD)
         self.output_text.grid(row=0, column=0, sticky="nsew")
 
     def create_start_control_tab(self, parent_frame):
-        control_frame = tk.LabelFrame(parent_frame, text="控制面板", padx=5, pady=5)
+        # Main container frame for this tab
+        main_container = tk.Frame(parent_frame)
+        main_container.pack(fill=tk.BOTH, expand=True)
+        main_container.grid_columnconfigure(0, weight=1)
+
+        control_frame = tk.LabelFrame(main_container, text="控制面板", padx=5, pady=5)
         control_frame.grid(row=0, column=0, sticky="ew")
+        control_frame.grid_columnconfigure(1, weight=1)
 
         ttk.Label(control_frame, text="Node IDs:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.node_ids_text = scrolledtext.ScrolledText(control_frame, height=5, width=60, wrap=tk.WORD)
@@ -120,6 +141,9 @@ class NexusGUI:
         self.proxy_user_pwd_label.grid(row=4, column=0, padx=5, pady=5, sticky=tk.W)
         self.proxy_user_pwd_entry = ttk.Entry(control_frame, width=50)
         self.proxy_user_pwd_entry.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
+        
+        self.test_proxy_button = ttk.Button(control_frame, text="测试代理", command=self.test_proxy)
+        self.test_proxy_button.grid(row=4, column=2, padx=5, pady=5, sticky="e")
 
         self.restart_enabled = tk.BooleanVar()
         restart_check = ttk.Checkbutton(control_frame, text="定时重启 (小时):", variable=self.restart_enabled)
@@ -139,6 +163,31 @@ class NexusGUI:
         
         self.save_ids_button = ttk.Button(button_frame, text="保存列表", command=self.save_node_ids)
         self.save_ids_button.grid(row=0, column=2, padx=5)
+
+        # --- Statistics Frame ---
+        stats_frame = tk.LabelFrame(main_container, text="统计信息", padx=5, pady=5)
+        stats_frame.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        stats_frame.grid_columnconfigure(1, weight=1)
+
+        stats_map = {
+            "total_tasks_fetched": "成功获取的任务数量:",
+            "unique_tasks_fetched": "唯一的任务数量:",
+            "duplicate_tasks_fetched": "重复获取的任务数量:",
+            "successful_submissions": "成功提交的任务数量:",
+            "failed_submissions": "提交失败的任务数量:",
+        }
+        
+        row = 0
+        for key, text in stats_map.items():
+            label = ttk.Label(stats_frame, text=text)
+            label.grid(row=row, column=0, sticky="w", padx=5, pady=2)
+            value_label = ttk.Label(stats_frame, text="N/A", anchor="w")
+            value_label.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+            self.stats_labels[key] = value_label
+            row += 1
+
+        refresh_stats_button = ttk.Button(stats_frame, text="刷新统计", command=self.fetch_stats)
+        refresh_stats_button.grid(row=row, column=0, columnspan=2, pady=10)
 
         self.toggle_proxy()
 
@@ -166,7 +215,7 @@ class NexusGUI:
 
     def toggle_proxy(self):
         state = tk.NORMAL if self.proxy_enabled.get() else tk.DISABLED
-        for child in [self.proxy_url_label, self.proxy_url_entry, self.proxy_user_pwd_label, self.proxy_user_pwd_entry]:
+        for child in [self.proxy_url_label, self.proxy_url_entry, self.proxy_user_pwd_label, self.proxy_user_pwd_entry, self.test_proxy_button]:
             child.config(state=state)
 
     def log(self, message):
@@ -256,8 +305,9 @@ class NexusGUI:
             self.log("--------------------")
 
     def restart_cli(self):
-        self.log("定时重启：正在重启CLI...")
+        self.log("开始定时重启...")
         self.stop_cli(restarting=True)
+        # Give some time for resources to be released
         self.master.after(2000, self.start_cli)
 
     def save_node_ids(self):
@@ -285,7 +335,7 @@ class NexusGUI:
 
     def on_closing(self):
         if self.process:
-            if messagebox.askokcancel("退出", "CLI正在运行。确定要退出并终止CLI吗?"):
+             if messagebox.askokcancel("退出", "CLI进程仍在运行。确定要退出吗？"):
                 self.stop_cli()
                 self.master.destroy()
         else:
@@ -381,7 +431,110 @@ class NexusGUI:
         self.log("批量创建节点操作完成。")
 
     def show_about(self):
-        messagebox.showinfo("关于", "Nexus Network GUI\n\n一个用于简化操作的图形界面。")
+        about_message = "Nexus Network GUI\n\n版本: 1.1.0\n一个用于简化 'nexus-network-mac' CLI 操作的图形界面工具。"
+        messagebox.showinfo("关于 NexusGUI", about_message)
+        
+    def test_proxy(self):
+        """Starts the proxy test in a separate thread."""
+        if not self.proxy_enabled.get():
+            messagebox.showinfo("提示", "请先勾选 '使用代理'。")
+            return
+        threading.Thread(target=self._test_proxy_thread, daemon=True).start()
+
+    def _test_proxy_thread(self):
+        """Handles the logic for testing the proxy connection."""
+        proxy_url_str = self.proxy_url_entry.get().strip()
+        if not proxy_url_str:
+            self.master.after(0, lambda: messagebox.showwarning("警告", "请输入代理URL。"))
+            return
+
+        proxy_pwd = self.proxy_user_pwd_entry.get().strip()
+        
+        user = None
+        host_port = proxy_url_str
+        if '@' in proxy_url_str:
+            try:
+                user, host_port = proxy_url_str.split('@', 1)
+            except ValueError:
+                self.master.after(0, lambda: messagebox.showerror("错误", "代理URL格式无效。"))
+                return
+
+        scheme = "http" # Assume http proxy, as requests library supports this for https traffic as well.
+        
+        if user and proxy_pwd:
+            proxy_for_requests = f"{scheme}://{user}:{proxy_pwd}@{host_port}"
+        elif user:
+            proxy_for_requests = f"{scheme}://{user}@{host_port}"
+        else:
+            proxy_for_requests = f"{scheme}://{host_port}"
+
+        proxies = {'http': proxy_for_requests, 'https': proxy_for_requests}
+        test_url = "https://ipinfo.io/json"
+        
+        self.log(f"正在测试代理: {proxy_for_requests} ...")
+        try:
+            response = requests.get(test_url, proxies=proxies, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            info_str = "\n".join([f"{k}: {v}" for k, v in data.items()])
+            self.log("代理测试成功。")
+            self.master.after(0, lambda: messagebox.showinfo("代理测试成功", f"代理工作正常！\n\nIP信息:\n{info_str}"))
+
+        except requests.exceptions.ProxyError as e:
+            error_message = f"代理连接失败。请检查地址、端口和认证信息。\n错误: {e}"
+            self.log(error_message)
+            self.master.after(0, lambda: messagebox.showerror("代理测试失败", error_message))
+        except requests.exceptions.Timeout:
+            error_message = "请求超时。请检查代理服务器和网络连接。"
+            self.log(error_message)
+            self.master.after(0, lambda: messagebox.showerror("代理测试失败", error_message))
+        except Exception as e:
+            error_message = f"发生未知错误: {e}"
+            self.log(error_message)
+            self.master.after(0, lambda: messagebox.showerror("代理测试失败", error_message))
+
+    def fetch_stats(self):
+        """Starts the statistics fetching in a separate thread."""
+        threading.Thread(target=self._fetch_stats_thread, daemon=True).start()
+
+    def _fetch_stats_thread(self):
+        """Handles the logic for fetching stats from the CLI."""
+        stats_url = "http://127.0.0.1:38080/stats"
+        self.log("正在获取统计信息...")
+        
+        if not self.process or self.process.poll() is not None:
+            self.log("CLI程序未运行，无法获取统计信息。")
+            self.master.after(0, self.reset_stats_labels)
+            return
+            
+        try:
+            response = requests.get(stats_url, timeout=5)
+            response.raise_for_status()
+            stats = response.json()
+            self.log("成功获取统计信息。")
+            self.master.after(0, self.update_stats_labels, stats)
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"获取统计信息失败: {e}")
+            self.master.after(0, self.reset_stats_labels)
+        except json.JSONDecodeError:
+            self.log("获取统计信息失败: 响应内容不是有效的JSON格式。")
+            self.master.after(0, self.reset_stats_labels)
+        except Exception as e:
+            self.log(f"处理统计信息时出错: {e}")
+            self.master.after(0, self.reset_stats_labels)
+
+    def update_stats_labels(self, stats):
+        """Updates the statistics labels on the GUI."""
+        for key, label in self.stats_labels.items():
+            label.config(text=str(stats.get(key, "错误")))
+
+    def reset_stats_labels(self):
+        """Resets statistics labels to 'N/A'."""
+        for label in self.stats_labels.values():
+            label.config(text="N/A")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
