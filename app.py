@@ -540,25 +540,43 @@ class NexusGUI:
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = NexusGUI(root)
-    root.protocol("WM_DELETE_WINDOW", app.on_closing)
+    try:
+        root = tk.Tk()
+        app = NexusGUI(root)
+        root.protocol("WM_DELETE_WINDOW", app.on_closing)
 
-    # --- macOS 焦点修复 ---
-    # 这是一个针对 Tkinter 在 macOS 上臭名昭著的 bug 的解决方案
-    # 该 bug 会导致应用程序窗口在启动时无法自动获得焦点。
-    if sys.platform == 'darwin': # 'darwin' 是 macOS 的系统名称
-        def force_focus():
-            # 将窗口强制置于最前
-            root.lift()
-            # 暂时将其设置为置顶窗口
-            root.attributes('-topmost', True)
-            # 在短暂延迟后，取消置顶，使其行为正常
-            root.after(10, lambda: root.attributes('-topmost', False))
-            # 强制窗口获取焦点
-            root.focus_force()
+        # --- macOS 焦点修复 ---
+        # 这是一个针对 Tkinter 在 macOS 上臭名昭著的 bug 的解决方案
+        # 该 bug 会导致应用程序窗口在启动时无法自动获得焦点。
+        if sys.platform == 'darwin': # 'darwin' 是 macOS 的系统名称
+            def force_focus():
+                # 将窗口强制置于最前
+                root.lift()
+                # 暂时将其设置为置顶窗口
+                root.attributes('-topmost', True)
+                # 在短暂延迟后，取消置顶，使其行为正常
+                root.after(10, lambda: root.attributes('-topmost', False))
+                # 强制窗口获取焦点
+                root.focus_force()
 
-        # 安排焦点修复在主循环开始时立即运行
-        root.after(0, force_focus)
+            # 安排焦点修复在主循环开始时立即运行
+            root.after(0, force_focus)
 
-    root.mainloop()
+        root.mainloop()
+    except Exception as e:
+        import traceback
+        import sys
+        # On macOS, the current working directory for a bundled app might not be what you expect.
+        # It's safer to write the log file next to the executable itself if possible.
+        if hasattr(sys, '_MEIPASS'):
+            # Path to executable in a PyInstaller bundle
+            exe_dir = os.path.dirname(sys.executable)
+            log_path = os.path.join(exe_dir, "gui_error.log")
+        else:
+            # Path for running from source
+            log_path = "gui_error.log"
+        
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("NexusGUI an unexpected error occurred:\n")
+            f.write(str(e) + "\n\n")
+            f.write(traceback.format_exc())
