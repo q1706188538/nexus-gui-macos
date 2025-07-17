@@ -377,13 +377,17 @@ class NexusGUI:
             # Load proxy settings
             proxy_info = settings.get("proxy", {})
             self.proxy_enabled.set(proxy_info.get("enabled", False))
+            self.log(f"proxy_url_entry赋值前state: {self.proxy_url_entry['state']}")
+            self.proxy_url_entry.config(state=tk.NORMAL)
             self.proxy_url_entry.delete(0, tk.END)
             self.proxy_url_entry.insert(0, proxy_info.get("url", ""))
-            self.log(f"赋值后proxy_url_entry内容: {self.proxy_url_entry.get()}")
+            self.log(f"proxy_url_entry赋值后内容: {self.proxy_url_entry.get()}，state: {self.proxy_url_entry['state']}")
 
+            self.log(f"proxy_user_pwd_entry赋值前state: {self.proxy_user_pwd_entry['state']}")
+            self.proxy_user_pwd_entry.config(state=tk.NORMAL)
             self.proxy_user_pwd_entry.delete(0, tk.END)
             self.proxy_user_pwd_entry.insert(0, proxy_info.get("password", ""))
-            self.log(f"赋值后proxy_user_pwd_entry内容: {self.proxy_user_pwd_entry.get()}")
+            self.log(f"proxy_user_pwd_entry赋值后内容: {self.proxy_user_pwd_entry.get()}，state: {self.proxy_user_pwd_entry['state']}")
             
             # Load restart settings
             restart_info = settings.get("restart", {})
