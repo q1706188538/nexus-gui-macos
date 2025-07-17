@@ -136,7 +136,7 @@ class NexusGUI:
         self.proxy_url_entry = ttk.Entry(control_frame, width=50)
         self.proxy_url_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
         
-        proxy_format_hint = ttk.Label(control_frame, text="提示: 代理地址格式为 [user@]host:port", font=("TkDefaultFont", 9), foreground="gray")
+        proxy_format_hint = ttk.Label(control_frame, text="提示: HTTP代理地址格式为 用户名@主机:端口  SOCKS5代理地址格式为 s5://用户名@主机:端口", font=("TkDefaultFont", 9), foreground="gray")
         proxy_format_hint.grid(row=3, column=1, padx=5, pady=(0, 5), sticky="w")
 
         self.proxy_user_pwd_label = ttk.Label(control_frame, text="代理密码 (Proxy Pwd):")
