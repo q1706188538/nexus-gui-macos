@@ -136,7 +136,7 @@ class NexusGUI:
         self.proxy_url_entry = ttk.Entry(control_frame, width=50)
         self.proxy_url_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
         
-        proxy_format_hint = ttk.Label(control_frame, text="提示: HTTP代理地址格式为 用户名@主机:端口  SOCKS5代理地址格式为 s5://用户名@主机:端口", font=("TkDefaultFont", 9), foreground="gray")
+        proxy_format_hint = ttk.Label(control_frame, text="代理地址格式为 用户名@主机:端口 或 s5://用户名@主机:端口", font=("TkDefaultFont", 9), foreground="gray")
         proxy_format_hint.grid(row=3, column=1, padx=5, pady=(0, 5), sticky="w")
 
         self.proxy_user_pwd_label = ttk.Label(control_frame, text="代理密码 (Proxy Pwd):")
@@ -364,12 +364,15 @@ class NexusGUI:
 
     def load_settings(self):
         """Loads settings from a file on startup."""
+        self.log(f"正在读取设置文件: {self.settings_path}")
         if not os.path.exists(self.settings_path):
             return
 
         try:
             with open(self.settings_path, "r", encoding="utf-8") as f:
-                settings = json.load(f)
+                raw_content = f.read()
+            self.log(f"读取到的内容: {raw_content}")
+            settings = json.loads(raw_content)
             
             # Load proxy settings
             proxy_info = settings.get("proxy", {})
