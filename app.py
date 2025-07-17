@@ -378,13 +378,15 @@ class NexusGUI:
             self.proxy_url_entry.insert(0, proxy_info.get("url", ""))
             self.proxy_user_pwd_entry.delete(0, tk.END)
             self.proxy_user_pwd_entry.insert(0, proxy_info.get("password", ""))
-            self.toggle_proxy()
             
             # Load restart settings
             restart_info = settings.get("restart", {})
             self.restart_enabled.set(restart_info.get("enabled", False))
             self.restart_interval_entry.delete(0, tk.END)
             self.restart_interval_entry.insert(0, restart_info.get("interval_hours", "5"))
+
+            # Apply the proxy enabled/disabled state AFTER loading all values
+            self.toggle_proxy()
 
             self.log("已加载保存的设置。")
 
